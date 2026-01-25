@@ -1,56 +1,79 @@
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+import pytorch_lightning as pl
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
 
 class MINDDataset(Dataset):
-    def __init__(self, behaviors_path, processor, config, mode='train'):
-        self.config = config
-        self.processor = processor
-        self.mode = mode
-        
-        # Load behaviors
-        self.data = pd.read_csv(behaviors_path, sep='\t', 
-                                names=['imp_id', 'u_id', 'time', 'history', 'impressions'])
-        
+    def __init__(self, df, processor, config, mode='train'):
+        self.config, self.processor, self.mode = config, processor, mode
+        self.data = df
         self.samples = self._prepare_samples()
 
     def _prepare_samples(self):
         samples = []
         for _, row in self.data.iterrows():
-            history_indices = self.processor.get_user_history(row['history'])
-            
-            # Split impressions: "N123-1 N456-0"
-            imps = row['impressions'].split()
-            positives = [i.split('-')[0] for i in imps if i.split('-')[1] == '1']
-            negatives = [i.split('-')[0] for i in imps if i.split('-')[1] == '0']
+            iid = int(row['imp_id']) 
+            hist = str(row['history']).split()
+            hist_ids = [self.processor.news_id_map.get(nid, 0) for nid in hist][-self.config.MAX_HISTORY_LEN:]
+            hist_ids = [0] * (self.config.MAX_HISTORY_LEN - len(hist_ids)) + hist_ids
+            imps = str(row['impressions']).split()
             
             if self.mode == 'train':
-                # Training logic: for every positive, pick K negatives (Negative Sampling)
-                for pos in positives:
-                    neg_sample = np.random.choice(negatives, self.config.NEG_SAMPLES, replace=True)
-                    # Label 1 for positive
-                    samples.append((history_indices, self.processor.news_id_map.get(pos, 0), 1.0))
-                    # Label 0 for negatives
-                    for neg in neg_sample:
-                        samples.append((history_indices, self.processor.news_id_map.get(neg, 0), 0.0))
+                pos = [i.split('-')[0] for i in imps if i.split('-')[1] == '1']
+                neg = [i.split('-')[0] for i in imps if i.split('-')[1] == '0']
+                for p in pos:
+                    neg_s = np.random.choice(neg, self.config.NEG_SAMPLES, replace=True) if neg else []
+                    samples.append((iid, hist_ids, self.processor.news_id_map.get(p, 0), 1.0))
+                    for n in neg_s: 
+                        samples.append((iid, hist_ids, self.processor.news_id_map.get(n, 0), 0.0))
             else:
-                # Validation logic: include everything as it is
-                for imp in imps:
-                    nid, label = imp.split('-')
-                    samples.append((history_indices, self.processor.news_id_map.get(nid, 0), float(label)))
+                for i in imps:
+                    nid, lbl = i.split('-')
+                    samples.append((iid, hist_ids, self.processor.news_id_map.get(nid, 0), float(lbl)))
         return samples
 
-    def __len__(self):
-        return len(self.samples)
+    def __len__(self): return len(self.samples)
 
     def __getitem__(self, idx):
-        hist, candidate, label = self.samples[idx]
+        iid, h_ids, c_id, label = self.samples[idx]
         
-        # Fetch the title features for history and candidate
-        hist_features = np.stack([self.processor.news_features[nid] for nid in hist])
-        cand_features = self.processor.news_features[candidate]
+        def get_feats(nids):
+            return {
+                'text': torch.stack([self.processor.news_features[i]['text'] for i in nids]),
+                'mask': torch.stack([self.processor.news_features[i]['mask'] for i in nids]),
+                'ents': torch.stack([self.processor.news_features[i]['ents'] for i in nids])
+            }
+        
+        h_feats = get_feats(h_ids)
+        c_feat = self.processor.news_features[c_id]
         
         return {
-            "history": torch.tensor(hist_features, dtype=torch.long),
-            "candidate": torch.tensor(cand_features, dtype=torch.long),
+            "imp_id": torch.tensor(iid, dtype=torch.long),
+            "h_text": h_feats['text'], "h_mask": h_feats['mask'], "h_ents": h_feats['ents'],
+            "c_text": c_feat['text'], "c_mask": c_feat['mask'], "c_ents": c_feat['ents'],
             "label": torch.tensor(label, dtype=torch.float)
         }
+
+class MINDDataModule(pl.LightningDataModule):
+    def __init__(self, processor, config):
+        super().__init__()
+        self.processor = processor
+        self.config = config
+
+    def setup(self, stage=None):
+        train_full = pd.read_csv(self.config.TRAIN_BEHAVIORS, sep='\t', names=['imp_id', 'u_id', 'time', 'history', 'impressions'])
+        if self.config.DEBUG: train_full = train_full.head(self.config.DEBUG_SAMPLES)
+        train_df, val_df = train_test_split(train_full, test_size=self.config.VAL_SPLIT_RATIO, random_state=42)
+        
+        test_df = pd.read_csv(self.config.VAL_BEHAVIORS, sep='\t', names=['imp_id', 'u_id', 'time', 'history', 'impressions'])
+        if self.config.DEBUG: test_df = test_df.head(100)
+
+        self.train_ds = MINDDataset(train_df, self.processor, self.config, 'train')
+        self.val_ds = MINDDataset(val_df, self.processor, self.config, 'val')
+        self.test_ds = MINDDataset(test_df, self.processor, self.config, 'test')
+
+    def train_dataloader(self): return DataLoader(self.train_ds, batch_size=self.config.BATCH_SIZE, shuffle=True)
+    def val_dataloader(self): return DataLoader(self.val_ds, batch_size=self.config.BATCH_SIZE)
+    def test_dataloader(self): return DataLoader(self.test_ds, batch_size=self.config.BATCH_SIZE)
