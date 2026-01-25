@@ -35,12 +35,7 @@ def evaluate(model, dataloader, device):
     all_ndcg5 = []
     all_ndcg10 = []
 
-    # In a real scenario, we'd group by Impression ID. 
-    # Here we assume the DataLoader returns one impression's worth of data at a time
-    # or we aggregate them manually.
-    
+
     with torch.no_grad():
-        # For simplicity in this snippet, we aggregate scores and labels
-        # In the full version, you'd group these by the 'imp_id' from behaviors.tsv
         y_scores = []
         y_true = []
