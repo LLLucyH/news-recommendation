@@ -20,14 +20,18 @@ logging.set_verbosity_error()
 def parse_args():
     parser = argparse.ArgumentParser(description="MIND News Recommender Training")
 
+
     parser.add_argument("--data_root", type=str, default="data")
     parser.add_argument("--model_name", type=str, default="distilbert_model")
+
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--neg_samples", type=int, default=4)
     parser.add_argument("--dropout", type=float, default=0.2)
+    
     parser.add_argument("--val_split", type=float, default=0.05)   
+
     parser.add_argument("--hidden_dim", type=int, default=128)
     parser.add_argument("--num_heads", type=int, default=4)
     parser.add_argument("--max_title_len", type=int, default=50)
@@ -38,7 +42,7 @@ def parse_args():
     parser.add_argument("--no_llm", action='store_false', dest='use_llm')
     parser.add_argument("--no_ent", action='store_false', dest='use_entities')
     parser.add_argument("--debug", action='store_true')
-    
+
     parser.add_argument("--gpus", type=int, default=None)
 
     return parser.parse_args()
@@ -65,7 +69,6 @@ def main():
         USE_LLM=args.use_llm,
         USE_ENTITIES=args.use_entities
     )
-
 
     if args.gpus is not None:
         cfg.NUM_DEVICES = args.gpus

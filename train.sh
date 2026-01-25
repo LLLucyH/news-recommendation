@@ -7,7 +7,6 @@
 #SBATCH -e logs/%j.err
 
 
-
 srun python -u train_baseline.py "$@"
 
 
