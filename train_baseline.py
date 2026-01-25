@@ -1,23 +1,3 @@
-r"""
-MIND Baseline Training Script
-=============================
-
-This script trains a baseline Logistic Regression model for the MIND news recommendation
-task. It supports two feature extraction methods:
-
-1.  **Entity Embeddings**: Uses the average of pre-trained Knowledge Graph embeddings
-    associated with entities in the news title.
-2.  **TF-IDF + SVD**: Uses Latent Semantic Analysis (LSA) on the news titles to
-    generate dense vectors.
-
-The model represents a user as the average vector of their history and a candidate
-news item as its own vector. The features passed to the classifier are the concatenation
-of the User Vector and the Candidate Vector.
-
-Usage:
-    python train_baseline.py --method tfidf --svd_dim 100
-    python train_baseline.py --method entity
-"""
 
 import argparse
 import os
@@ -39,22 +19,6 @@ from src.processor import MindProcessor
 def get_entity_vector_map(
     processor: MindProcessor,
 ) -> Tuple[Dict[str, np.ndarray], int]:
-    """
-    Extract mean entity vectors for all news items using the MindProcessor.
-
-    Iterates through the news dictionary in the processor. For each news item,
-    it retrieves the associated entity IDs, looks up their pre-trained embeddings,
-    and computes the mean vector.
-
-    Args:
-        processor (MindProcessor): Initialized processor with loaded entity embeddings
-            and news dictionaries.
-
-    Returns:
-        Tuple[Dict[str, np.ndarray], int]:
-            - A dictionary mapping News ID (str) to its dense vector (np.ndarray).
-            - The dimension of the embeddings.
-    """
     dim = processor.config.ENTITY_EMB_DIM
     news_vec_map = {}
 
@@ -84,22 +48,7 @@ def get_entity_vector_map(
 def get_tfidf_vector_map(
     cfg: Config, n_components: int = 100
 ) -> Tuple[Dict[str, np.ndarray], int]:
-    """
-    Calculate TF-IDF + SVD (LSA) vectors for all news titles.
 
-    1.  Loads all news titles from training and validation sets.
-    2.  Computes a TF-IDF matrix (max 10k features).
-    3.  Reduces dimensionality using TruncatedSVD to `n_components`.
-
-    Args:
-        cfg (Config): Configuration object containing paths to news files.
-        n_components (int, optional): Target dimension for SVD. Defaults to 100.
-
-    Returns:
-        Tuple[Dict[str, np.ndarray], int]:
-            - A dictionary mapping News ID (str) to its dense vector (np.ndarray).
-            - The dimension of the resulting vectors.
-    """
     print("Loading news for TF-IDF...")
     news_train = pd.read_csv(
         cfg.TRAIN_NEWS,
@@ -138,26 +87,7 @@ def prepare_features(
     dim: int,
     limit: Optional[int] = None,
 ) -> Tuple[np.ndarray, np.ndarray, List[str]]:
-    """
-    Convert behavior dataframe into feature matrices (X) and labels (y).
 
-    For each impression:
-    1.  **User Vector**: Average of vectors for all news in the user's history.
-    2.  **Candidate Vector**: Vector for the specific candidate news item.
-    3.  **Feature**: Concatenation of [User Vector, Candidate Vector].
-
-    Args:
-        df (pd.DataFrame): Behavior dataframe containing history and impressions.
-        news_vec_map (Dict[str, np.ndarray]): Mapping from News ID to dense vector.
-        dim (int): Dimension of the single news vector.
-        limit (int, optional): Limit the number of rows processed (for debugging).
-
-    Returns:
-        Tuple[np.ndarray, np.ndarray, List[str]]:
-            - X: Feature matrix of shape (n_samples, dim * 2).
-            - y: Label array of shape (n_samples,).
-            - imp_ids: List of impression IDs corresponding to each row in X.
-    """
     if limit:
         df = df.head(limit)
 
@@ -194,18 +124,7 @@ def prepare_features(
 
 
 def main() -> None:
-    """
-    Main execution function for baseline training.
 
-    Steps:
-    1.  Parse arguments (method selection, dimensions).
-    2.  Build or load news vectors (Entity or TF-IDF).
-    3.  Load behavior data (Train/Val).
-    4.  Generate feature matrices (X, y).
-    5.  Train Logistic Regression.
-    6.  Evaluate AUC on validation set.
-    7.  Save predictions to CSV.
-    """
     parser = argparse.ArgumentParser(description="MIND Baseline: Entity vs TF-IDF")
     parser.add_argument(
         "--method",
