@@ -17,6 +17,7 @@ search_space = {
 
 NUM_EXPERIMENTS = 10 
 
+
 if not os.path.exists("logs"):
     os.makedirs("logs")
 
@@ -29,10 +30,9 @@ for i in range(NUM_EXPERIMENTS):
     lr = random.choice(search_space["lr"])
     neg = random.choice(search_space["neg_samples"])
     drp = random.choice(search_space["dropout"])
-    
+
     cmd = f"sbatch train.sh {t_len} {h_len} {e_len} {h_dim} {bs} {lr} {neg} {drp}"
     
     print(f"Launching Job {i+1}: {cmd}")
     os.system(cmd)
-    
     time.sleep(1)
