@@ -34,10 +34,9 @@ import pandas as pd
 import pytorch_lightning as pl
 import torch
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, Dataset
 
 
-class MINDDataset(Dataset):
+class MINDDataset(torch.utils.data.Dataset):
     """
     PyTorch Dataset for the MIND news recommendation task.
 
@@ -249,16 +248,16 @@ class MINDDataModule(pl.LightningDataModule):
         self.val_ds = MINDDataset(val_df, self.processor, self.config, "val")
         self.test_ds = MINDDataset(test_df, self.processor, self.config, "test")
 
-    def train_dataloader(self) -> DataLoader:
+    def train_dataloader(self) -> torch.utils.data.DataLoader:
         """Return the training DataLoader."""
-        return DataLoader(
+        return torch.utils.data.DataLoader(
             self.train_ds, batch_size=self.config.BATCH_SIZE, shuffle=True
         )
 
-    def val_dataloader(self) -> DataLoader:
+    def val_dataloader(self) -> torch.utils.data.DataLoader:
         """Return the validation DataLoader."""
-        return DataLoader(self.val_ds, batch_size=self.config.BATCH_SIZE)
+        return torch.utils.data.DataLoader(self.val_ds, batch_size=self.config.BATCH_SIZE)
 
-    def test_dataloader(self) -> DataLoader:
+    def test_dataloader(self) -> torch.utils.data.DataLoader:
         """Return the test DataLoader."""
-        return DataLoader(self.test_ds, batch_size=self.config.BATCH_SIZE)
+        return torch.utils.data.DataLoader(self.test_ds, batch_size=self.config.BATCH_SIZE)

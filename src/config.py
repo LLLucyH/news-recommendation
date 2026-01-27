@@ -30,13 +30,13 @@ The configuration is split into logical sections for model control and data mana
 """
 
 import os
-from dataclasses import dataclass
+import dataclasses
 from typing import Optional
 
 import torch
 
 
-@dataclass
+@dataclasses.dataclass
 class Config:
     """
     Configuration class for the News Recommendation Model.
@@ -114,6 +114,7 @@ class Config:
         This method constructs the standard file structure expected for the MIND dataset
         (e.g., `MINDsmall_train/behaviors.tsv`) if the user has not overridden specific paths.
         """
+    
         if self.TRAIN_BEHAVIORS is None:
             self.TRAIN_BEHAVIORS = os.path.join(
                 self.DATA_ROOT, "MINDsmall_train/behaviors.tsv"
