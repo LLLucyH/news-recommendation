@@ -8,21 +8,17 @@ Predicting user clicks on news is challenging because a user’s historical clic
 
 ## Methodology
 
-
 The model follows a specialized architecture designed for content-heavy environments:
-
 
 1. **News Encoder**: Both the candidate news and history items pass through a shared encoder. It fuses:
 * **Text Features**: Uses `DistilBERT` (distilbert-base-uncased) to encode news titles. We chose DistilBERT over the full BERT model to reduce the computational footprint during training.
 * **Knowledge Graph Features**: Integrated by extracting Wikidata entity IDs from the news metadata. These are mapped to pre-trained vectors and merged with the LLM output via a projection MLP.
-
 
 2. **Candidate-Aware User Encoder**:
 * Employs **Multi-Head Cross-Attention**.
 * The **Candidate News** vector acts as the **Query (Q)**.
 * The **User History** vectors act as **Keys (K)** and **Values (V)**.
 * This allows the model to attend more strongly to history items related to the current candidate.
-
 
 3. **Prediction**: A sigmoid-activated inner product between the context-aware user vector and the candidate vector.
 
