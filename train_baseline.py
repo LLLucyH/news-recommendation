@@ -21,14 +21,11 @@ Usage:
 
 import argparse
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import TruncatedSVD
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_auc_score
+import sklearn
 from tqdm import tqdm
 from rich import print
 
@@ -118,10 +115,10 @@ def get_tfidf_vector_map(
     news_ids = all_news["id"].tolist()
 
     print(f"Fitting TF-IDF and SVD (dim={n_components})...")
-    tfidf = TfidfVectorizer(stop_words="english", max_features=10000)
+    tfidf = sklearn.feature_extraction.text.TfidfVectorizer(stop_words="english", max_features=10000)
     tfidf_matrix = tfidf.fit_transform(titles)
 
-    svd = TruncatedSVD(n_components=n_components, random_state=42)
+    svd = sklearn.decomposition.TruncatedSVD(n_components=n_components, random_state=42)
     low_dim_vectors = svd.fit_transform(tfidf_matrix)
 
     news_vec_map = {
@@ -259,12 +256,12 @@ def main() -> None:
     X_test, y_test, test_imp_ids = prepare_features(val_df, news_vec_map, dim)
 
     print(f"Training Logistic Regression on {len(X_train)} samples...")
-    clf = LogisticRegression(max_iter=1000, solver="lbfgs", n_jobs=-1)
+    clf = sklearn.linear_model.LogisticRegression(max_iter=1000, solver="lbfgs", n_jobs=-1)
     clf.fit(X_train, y_train)
 
     print("Evaluating...")
     preds = clf.predict_proba(X_test)[:, 1]
-    auc = roc_auc_score(y_test, preds)
+    auc = sklearn.metrics.roc_auc_score(y_test, preds)
     print(f"\n[{args.method.upper()}] Baseline AUC: {auc:.4f}")
 
     os.makedirs("baseline_results", exist_ok=True)

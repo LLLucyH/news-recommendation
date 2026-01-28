@@ -37,14 +37,14 @@ Architecture Overview
 ### **Core Attributes**
 The class maintains PyTorch neural network layers and TorchMetrics for evaluation.
 
-| **Attribute**       | **Type**                 | **Description** |
-|---------------------|--------------------------|-----------------|
-| `bert`              | `AutoModel`              | Pre-trained Transformer (if USE_LLM is True). |
-| `cnn`               | `nn.Conv1d`              | 1D Convolution for word embeddings (if USE_LLM is False). |
-| `ent_emb`           | `nn.Embedding`           | Pre-trained entity embeddings (optional). |
-| `news_projector`    | `nn.Sequential`          | Projects concatenated text+entity vectors to hidden dim. |
-| `cross_attention`   | `nn.MultiheadAttention`  | Models user interest via attention between candidate and history. |
-| `criterion`         | `nn.BCEWithLogitsLoss`   | Binary Cross Entropy loss for click prediction. |
+| **Attribute**       | **Type**                       | **Description** |
+|---------------------|--------------------------------|-----------------|
+| `bert`              | `transformers.AutoModel`       | Pre-trained Transformer (if USE_LLM is True). |
+| `cnn`               | `torch.nn.Conv1d`              | 1D Convolution for word embeddings (if USE_LLM is False). |
+| `ent_emb`           | `torch.nn.Embedding`           | Pre-trained entity embeddings (optional). |
+| `news_projector`    | `torch.nn.Sequential`          | Projects concatenated text+entity vectors to hidden dim. |
+| `cross_attention`   | `torch.nn.MultiheadAttention`  | Models user interest via attention between candidate and history. |
+| `criterion`         | `torch.nn.BCEWithLogitsLoss`   | Binary Cross Entropy loss for click prediction. |
 
 """
 
@@ -53,16 +53,8 @@ from typing import Any, Dict, Tuple
 
 import pytorch_lightning as pl
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torchmetrics.classification import BinaryAUROC
-from torchmetrics.retrieval import (
-    RetrievalMRR,
-    RetrievalNormalizedDCG,
-    RetrievalRecall,
-)
-from transformers import AutoModel
+import torchmetrics
+import transformers
 
 
 class ImpressionClassifier(pl.LightningModule):
@@ -72,12 +64,12 @@ class ImpressionClassifier(pl.LightningModule):
     Attributes:
         config (object): Configuration object containing model hyperparameters.
         bert (AutoModel, optional): HuggingFace Transformer model.
-        emb (nn.Embedding, optional): Word embedding layer.
-        cnn (nn.Conv1d, optional): Convolutional layer for text encoding.
-        ent_emb (nn.Embedding, optional): Entity embedding layer.
-        news_projector (nn.Sequential): MLP to project news representations.
-        cross_attention (nn.MultiheadAttention): Attention mechanism for user modeling.
-        criterion (nn.Module): Loss function.
+        emb (torch.nn.Embedding, optional): Word embedding layer.
+        cnn (torch.nn.Conv1d, optional): Convolutional layer for text encoding.
+        ent_emb (torch.nn.Embedding, optional): Entity embedding layer.
+        news_projector (torch.nn.Sequential): MLP to project news representations.
+        cross_attention (torch.nn.MultiheadAttention): Attention mechanism for user modeling.
+        criterion (torch.nn.Module): Loss function.
         auc (BinaryAUROC): Metric for Area Under the ROC Curve.
         ndcg5 (RetrievalNormalizedDCG): Metric for NDCG@5.
         ndcg10 (RetrievalNormalizedDCG): Metric for NDCG@10.
@@ -111,13 +103,13 @@ class ImpressionClassifier(pl.LightningModule):
 
         # --- Text Encoder ---
         if config.USE_LLM:
-            self.bert = AutoModel.from_pretrained(config.MODEL_NAME)
+            self.bert = transformers.AutoModel.from_pretrained(config.MODEL_NAME)
             for p in self.bert.parameters():
                 p.requires_grad = False
             text_dim = config.LLM_OUTPUT_DIM
         else:
-            self.emb = nn.Embedding(vocab_size, config.WORD_EMB_DIM, padding_idx=0)
-            self.cnn = nn.Conv1d(
+            self.emb = torch.nn.Embedding(vocab_size, config.WORD_EMB_DIM, padding_idx=0)
+            self.cnn = torch.nn.Conv1d(
                 config.WORD_EMB_DIM,
                 config.HIDDEN_DIM,
                 config.CNN_FILTER_SIZE,
@@ -129,34 +121,34 @@ class ImpressionClassifier(pl.LightningModule):
         self.ent_dim = 0
         self.num_ent_embeddings = 0
         if config.USE_ENTITIES and entity_vectors is not None:
-            self.ent_emb = nn.Embedding.from_pretrained(
+            self.ent_emb = torch.nn.Embedding.from_pretrained(
                 entity_vectors, freeze=False, padding_idx=0
             )
             self.ent_dim = entity_vectors.shape[1]
             self.num_ent_embeddings = entity_vectors.shape[0]
 
         # --- Projection ---
-        self.news_projector = nn.Sequential(
-            nn.Linear(text_dim + self.ent_dim, config.HIDDEN_DIM),
-            nn.ReLU(),
-            nn.Dropout(config.DROPOUT),
+        self.news_projector = torch.nn.Sequential(
+            torch.nn.Linear(text_dim + self.ent_dim, config.HIDDEN_DIM),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(config.DROPOUT),
         )
 
         # --- Candidate-Aware User Encoder (Cross-Attention) ---
-        self.cross_attention = nn.MultiheadAttention(
+        self.cross_attention = torch.nn.MultiheadAttention(
             embed_dim=config.HIDDEN_DIM,
             num_heads=config.NUM_HEADS,
             batch_first=True,
         )
 
-        self.criterion = nn.BCEWithLogitsLoss()
+        self.criterion = torch.nn.BCEWithLogitsLoss()
 
         # Metrics
-        self.auc = BinaryAUROC()
-        self.ndcg5 = RetrievalNormalizedDCG(top_k=5)
-        self.ndcg10 = RetrievalNormalizedDCG(top_k=10)
-        self.mrr = RetrievalMRR()
-        self.recall10 = RetrievalRecall(top_k=10)
+        self.auc = torchmetrics.classification.BinaryAUROC()
+        self.ndcg5 = torchmetrics.retrieval.RetrievalNormalizedDCG(top_k=5)
+        self.ndcg10 = torchmetrics.retrieval.RetrievalNormalizedDCG(top_k=10)
+        self.mrr = torchmetrics.retrieval.RetrievalMRR()
+        self.recall10 = torchmetrics.retrieval.RetrievalRecall(top_k=10)
 
     def encode_news(
         self, x: torch.Tensor, mask: torch.Tensor, ents: torch.Tensor
@@ -182,7 +174,7 @@ class ImpressionClassifier(pl.LightningModule):
             ]
         else:
             # CNN expects (Batch, Channels, Length)
-            t_vec = F.relu(self.cnn(self.emb(x).transpose(1, 2))).max(dim=-1)[0]
+            t_vec = torch.nn.functional.relu(self.cnn(self.emb(x).transpose(1, 2))).max(dim=-1)[0]
 
         if self.config.USE_ENTITIES and self.ent_dim > 0:
             ents = torch.clamp(ents, 0, self.num_ent_embeddings - 1)
@@ -380,11 +372,11 @@ class ImpressionClassifier(pl.LightningModule):
     def on_test_epoch_end(self) -> None:
         self._log_metrics("test")
 
-    def configure_optimizers(self) -> optim.Optimizer:
+    def configure_optimizers(self) -> torch.optim.Optimizer:
         """
         Configure the optimizer.
 
         Returns:
             optim.Optimizer: Adam optimizer with learning rate from config.
         """
-        return optim.Adam(self.parameters(), lr=self.config.LEARNING_RATE)
+        return torch.optim.Adam(self.parameters(), lr=self.config.LEARNING_RATE)

@@ -33,16 +33,17 @@ Output
 """
 
 import os
+from typing import Dict, Union
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Union
-from joblib import Parallel, delayed
-from sklearn.metrics import roc_auc_score
-from rich.console import Console
+import joblib
+import sklearn.metrics
+import rich
 from rich.table import Table
 from tqdm import tqdm
 
-console = Console()
+console = rich.console.Console()
 
 
 def get_metric_arrays(file_path: str) -> Union[Dict[str, np.ndarray], str]:
@@ -166,7 +167,7 @@ def _auc_worker(y_true: np.ndarray, y_score: np.ndarray, seed: int) -> Union[flo
     yt_bs = y_true[idx]
     if len(np.unique(yt_bs)) < 2: 
         return None
-    return roc_auc_score(yt_bs, y_score[idx])
+    return sklearn.metrics.roc_auc_score(yt_bs, y_score[idx])
 
 
 def compute_auc_ci(y_true: np.ndarray, y_score: np.ndarray, n_bootstrap: int = 1000) -> str:
@@ -189,8 +190,8 @@ def compute_auc_ci(y_true: np.ndarray, y_score: np.ndarray, n_bootstrap: int = 1
     rng = np.random.default_rng(42)
     seeds = rng.integers(0, 10**9, size=n_bootstrap)
     
-    results = Parallel(n_jobs=-1)(
-        delayed(_auc_worker)(y_true, y_score, s) 
+    results = joblib.Parallel(n_jobs=-1)(
+        joblib.delayed(_auc_worker)(y_true, y_score, s) 
         for s in tqdm(seeds, desc="    Global AUC Bootstrap", leave=False, ncols=80)
     )
     aucs = [r for r in results if r is not None]
@@ -227,7 +228,7 @@ def main() -> None:
         {"label": "Impression Clf (Pretrained, With Graph Embeddings)",  "path": "lightning_logs/version_4005793/test_eval_results.csv"},
     ]
 
-    table = Table(title=f"Model Performance Summary (Bootstrap n={N_BOOTSTRAP})")
+    table = rich.table.Table(title=f"Model Performance Summary (Bootstrap n={N_BOOTSTRAP})")
     table.add_column("Model Variant", style="cyan", no_wrap=True)
     table.add_column("AUC", justify="center")
     table.add_column("nDCG@5", justify="center")

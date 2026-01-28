@@ -1,7 +1,6 @@
 r"""
 Random Search Launcher
 ======================
-
 This script automates the process of hyperparameter tuning using random search.
 It defines a search space for various model parameters (e.g., learning rate,
 batch size, dimensions) and submits multiple training jobs to a Slurm cluster
@@ -31,6 +30,7 @@ def main() -> None:
     2.  Create the logging directory if it does not exist.
     3.  Iteratively sample hyperparameters and submit Slurm jobs.
     """
+   
     # Number of parallel experiments to launch
     num_experiments = 10
 

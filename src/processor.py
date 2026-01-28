@@ -36,9 +36,9 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 import torch
+import transformers
 from rich import print
 from tqdm import tqdm
-from transformers import AutoTokenizer
 
 
 class MindProcessor:
@@ -81,7 +81,7 @@ class MindProcessor:
         }
 
         if config.USE_LLM:
-            self.tokenizer = AutoTokenizer.from_pretrained(
+            self.tokenizer = transformers.AutoTokenizer.from_pretrained(
                 config.MODEL_NAME, local_files_only=True
             )
 

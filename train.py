@@ -21,7 +21,6 @@ import os
 import sys
 
 import pytorch_lightning as pl
-import torch
 import torch.distributed as dist
 from pytorch_lightning.callbacks import ModelCheckpoint
 from rich import print

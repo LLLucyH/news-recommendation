@@ -47,6 +47,7 @@ class GPUMemoryCallback(pl.Callback):
             trainer (pl.Trainer): The PyTorch Lightning trainer instance.
             pl_module (pl.LightningModule): The model module.
         """
+        del trainer, pl_module
         if torch.cuda.is_available():
             torch.cuda.reset_peak_memory_stats()
             print("GPU Memory tracking started...")
@@ -59,6 +60,7 @@ class GPUMemoryCallback(pl.Callback):
             trainer (pl.Trainer): The PyTorch Lightning trainer instance.
             pl_module (pl.LightningModule): The model module.
         """
+        del trainer, pl_module
         if torch.cuda.is_available():
             max_memory = torch.cuda.max_memory_allocated()
             print(f"\n{'='*40}")
@@ -121,6 +123,7 @@ class SaveTestResultsCallback(pl.Callback):
             batch_idx (int): Index of the batch.
             dataloader_idx (int, optional): Index of the dataloader. Defaults to 0.
         """
+        del trainer, pl_module, batch, batch_idx, dataloader_idx
         preds = outputs["preds"].detach().cpu().numpy()
         targets = outputs["targets"].detach().cpu().numpy()
         self.predictions.extend(preds.flatten().tolist())
@@ -147,6 +150,7 @@ class SaveTestResultsCallback(pl.Callback):
             trainer (pl.Trainer): The PyTorch Lightning trainer instance.
             pl_module (pl.LightningModule): The model module.
         """
+        del pl_module
         if self.output_dir:
             save_dir = self.output_dir
         elif trainer.logger and trainer.logger.log_dir:
